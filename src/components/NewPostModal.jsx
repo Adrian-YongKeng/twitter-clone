@@ -1,18 +1,26 @@
-import { useState } from "react";
+import { useContext, useState } from "react";
 import { Button, Form, Modal } from "react-bootstrap";
 import { useDispatch } from "react-redux";
 import { savePost } from "../features/posts/postsSlice";
+import { AuthContext } from "./AuthProvider";
 
 export default function NewPostModal({ show, handleClose }) {
   const [postContent, setPostContent] = useState("");
+  const [file, setFile] =useState(null);
   const dispatch = useDispatch();
+  const {currentUser} = useContext(AuthContext);
+  const userId = currentUser.uid;
 
   const handleSave = () => {
-    //Get stored JWT Token
-    dispatch(savePost(postContent));
+    dispatch(savePost({userId, postContent, file}));
     handleClose();
     setPostContent("");
+    setFile(null);
   };
+
+  const handleFileChange = (e) => {
+    setFile(e.target.files[0]);
+  }
 
   return (
     <>
@@ -28,6 +36,8 @@ export default function NewPostModal({ show, handleClose }) {
                 onChange={(e) => setPostContent(e.target.value)}
               />
             </Form.Group>
+            <br/> 
+            <Form.Control type="file" onChange={handleFileChange}/>
           </Form>
         </Modal.Body>
         <Modal.Footer>

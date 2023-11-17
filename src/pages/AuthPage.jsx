@@ -1,12 +1,11 @@
-import axios from "axios";
-import { useEffect, useState } from "react";
+import { FacebookAuthProvider, GoogleAuthProvider, createUserWithEmailAndPassword, getAuth, sendPasswordResetEmail, signInWithEmailAndPassword, signInWithPopup } from "firebase/auth";
+import { useContext, useEffect, useState } from "react";
 import {Col, Image, Row,  Modal, Form, Button, Alert} from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
-import useLocalStorage from "use-local-storage";
+import { AuthContext } from "../components/AuthProvider";
 
 export default function AuthPage () {
     const loginImage = "https://sig1.co/img-twitter-1";
-    const url = "https://auth-back-end-yy1123.sigma-school-full-stack.repl.co";
    
     //possible values: null(no modal show, login , signup)
     const [modalShow, setModalShow] = useState(null);
@@ -14,7 +13,6 @@ export default function AuthPage () {
     const handleShowLogin = () => setModalShow("Login");
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
-    const [authToken, setAuthToken] = useLocalStorage("authToken", "");
 
     const navigate = useNavigate();
     const [signupMessage, setSignupMessage] = useState(null);
@@ -23,11 +21,29 @@ export default function AuthPage () {
     const [loginMessage, setLoginMessage] = useState(null);
     const [showSuccess, setShowSuccess] = useState(null);
 
-    useEffect (() => {
-        if(authToken) {
-            navigate("/profile");
-        }
-    }, [authToken, navigate]);
+    const auth = getAuth();
+    const {currentUser} = useContext(AuthContext);
+    const provider = new GoogleAuthProvider();
+    const fbProvider = new FacebookAuthProvider();
+
+    const [showPasswordResetModal, setShowPasswordResetModal] = useState(false);
+    const [resetEmail, setResetEmail] = useState("");
+
+    const [showPhoneLoginModal, setShowPhoneLoginModal] = useState(false);
+    const [phoneNumber, setPhoneNumber] =useState("");
+    const [code, setCode] =useState("");
+    const [verificationId, setVerificationId] = useState(null);
+
+
+    useEffect(() => {
+        console.log(currentUser)
+        if(currentUser) navigate("/profile");
+    }, [currentUser, navigate])
+   // useEffect (() => {
+   //     if(authToken) {
+   //         navigate("/profile");
+   //     }
+   // }, [authToken, navigate]);
 
     const isStrongPassword = (password) => {
         const passwordRegex = /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*\W).{8,}$/;
@@ -42,8 +58,8 @@ export default function AuthPage () {
             return; // Don't proceed with the signup
         }
         try {
-            const res = await axios.post(`${url}/signup`, {username, password});
-            console.log(res.data);
+            const res = await createUserWithEmailAndPassword(auth, username, password);
+            console.log(res.user);
             if (res.status === 201) { // User registered successfully
                 setShowSuccess(res.data.message);
             }
@@ -62,26 +78,67 @@ export default function AuthPage () {
 
     const handleLogin = async (e) =>  {
         e.preventDefault();
+        setLoginMessage(null)
         try {
-            const res = await axios.post(`${url}/login`, {username, password});
-            //console.log("Response from server:", res); // Log the response
-            if (res.data && res.data.auth === true && res.data.token) {
-                setAuthToken(res.data.token); //save token to local
-                console.log("Login was successful, token saved");
-            } 
+            await signInWithEmailAndPassword(auth, username, password);
+            console.log(currentUser)
         } catch (error) {
-            console.error(error);
-            if (error.response && error.response.status === 401) {
-               setLoginMessage("Username or password is incorrect.");
-              // setLoginMessage(error.response.data.message);
+
+            if (error.code === 'auth/invalid-email') {
+                setLoginMessage("Invalid email format.");
+            } else if (error.code === 'auth/user-disabled') {
+                setLoginMessage("This user account has been disabled.");
+            } else if (error.code === 'auth/user-not-found') {
+                setLoginMessage("User not found. Please check your email.");
+            } else if (error.code === 'auth/wrong-password') {
+                setLoginMessage("Incorrect password. Please try again.");
+            }  else {
+                setLoginMessage("Login failed. Please try again.");
             }
         }
     };
 
+    const handleGoogleLogin = async (e) => {
+        e.preventDefault();
+        try{
+            await signInWithPopup(auth, provider);
+        }catch(error) {
+            console.error(error)
+        }
+    }
+    const handleFacebookLogin = async (e) => {
+        e.preventDefault();
+        try{
+            await signInWithPopup(auth, fbProvider);
+        }catch(error) {
+            console.error(error)
+        }
+    }
+
+    const showResetModal = () => {
+        setShowPasswordResetModal(true);
+        setModalShow(null);
+    };
+    const handlePasswordReset = (email) => {
+        sendPasswordResetEmail(auth, email)
+        .then (() => {
+            // Inform the user that the email has been sent
+            alert("Password reset email sent!");
+            setShowPasswordResetModal(false);
+            setResetEmail("");
+            setModalShow(true);
+        })
+        .catch((error) => {
+            console.error("Error sending password reset email: ", error);
+            alert("Failed to send password reset email. Please try again.");
+        })
+    }
+
+
     const handleClose = () => {
         setModalShow(null);
         setSignupMessage(null);
-        setPasswordStrength(null)
+        setPasswordStrength(null);
         setLoginMessage(null);
         setShowSuccess(null);
     };
@@ -98,11 +155,11 @@ export default function AuthPage () {
                 <h2 className="my-5" style={{fontSize: 31}}>Join Twitter Today</h2>
 
                 <Col sm={5} className="d-grid gap-2">
-                    <Button className="rounded-pill" variant="outline-dark">
+                    <Button className="rounded-pill" variant="outline-dark" onClick={handleGoogleLogin}>
                         <i className="bi bi-google"></i> Sign Up with Google
                     </Button>
-                    <Button className="rounded-pill" variant="outline-dark">
-                        <i className="bi bi-apple"></i> Sign Up with Apple
+                    <Button className="rounded-pill" variant="outline-dark" onClick={handleFacebookLogin}>
+                        <i className="bi bi-facebook"></i> Sign Up with Facebook
                     </Button>
                     <p style={{textAlign: "center"}}>or</p>
                     <Button className="rounded-pill" onClick={handleShowSignUp}>
@@ -121,6 +178,13 @@ export default function AuthPage () {
                         onClick={handleShowLogin}
                     >
                         Sign In
+                    </Button>
+                    <Button 
+                        className="rounded-pill" 
+                        variant="outline-primary"
+                        onClick={() => showPhoneLoginModal}
+                    >
+                        <i className="bi bi-telephone-fill"></i> Sign In with Phone
                     </Button>
                 </Col>
                 <Modal 
@@ -154,7 +218,13 @@ export default function AuthPage () {
                                     type="password" 
                                     placeholder="Password"
                                 />
+                                {modalShow === "Login" && (
+                                    <p onClick={showResetModal} className="text-primary" style={{ cursor: "pointer" }}>
+                                        Forgot password?
+                                    </p>
+                                )}
                             </Form.Group>
+                            
                             {showSuccess ? (
                                 <Alert variant="success">
                                     {showSuccess}
@@ -171,6 +241,7 @@ export default function AuthPage () {
                                             {passwordStrength}
                                         </Alert>
                                     )}
+                                 
                                 </div>
                             )}
                             
@@ -195,6 +266,65 @@ export default function AuthPage () {
                         </Form>
                     </Modal.Body>
                 </Modal>
+
+                <Modal show={showPasswordResetModal} onHide={() => setShowPasswordResetModal(false)}>
+                <Modal.Header closeButton>
+                    <Modal.Title>Reset Password</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    <Form onSubmit={(e) => {
+                        e.preventDefault();
+                        handlePasswordReset(resetEmail);
+                    }}>
+                        <Form.Group>
+                            <Form.Label>Email Address</Form.Label>
+                            <Form.Control 
+                                type="email" 
+                                placeholder="Enter your email"
+                                value={resetEmail}
+                                onChange={(e) => setResetEmail(e.target.value)}
+                                required 
+                                className="mb-4"
+                            />
+                        </Form.Group>
+                        <Button variant="primary" type="submit">
+                            Send Reset Email
+                        </Button>
+                    </Form>
+                </Modal.Body>
+            </Modal>
+
+            <Modal show={showPhoneLoginModal} onHide={() => setShowPhoneLoginModal(false)}>
+                <Modal.Header closeButton>
+                    <Modal.Title>Phone Login</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    <Form>
+                        <Form.Group>
+                            <Form.Label>Phone Number</Form.Label>
+                            <Form.Control 
+                                type="tel" 
+                                placeholder="Enter your phone number"
+                                value={phoneNumber}
+                                onChange={(e) => setPhoneNumber(e.target.value)}
+                            />
+                        </Form.Group>
+                        {verificationId && (
+                            <Form.Group>
+                                <Form.Label>Verification Code</Form.Label>
+                                <Form.Control 
+                                    type="text" 
+                                    placeholder="Enter verification code"
+                                    value={code}
+                                    onChange={(e) => setCode(e.target.value)}
+                                />
+                            </Form.Group>
+                        )}
+                        
+                    </Form>
+                </Modal.Body>
+            </Modal>
+
             </Col>
         </Row>
     )
