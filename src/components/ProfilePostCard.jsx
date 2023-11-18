@@ -1,8 +1,9 @@
 import { useContext, useState } from "react";
-import { Button, Col, Image,  Row } from "react-bootstrap"
+import { Button, Col, Image,  Modal,  Row } from "react-bootstrap"
 import { useDispatch } from "react-redux";
 import { AuthContext } from "./AuthProvider";
-import { likePost, removeLikeFromPost } from "../features/posts/postsSlice";
+import { deletePost, likePost, removeLikeFromPost } from "../features/posts/postsSlice";
+import UpdatePostModal from "./UpdatePostModal";
 
 
 export default function ProfilePostCard ({ post}) {
@@ -16,21 +17,31 @@ export default function ProfilePostCard ({ post}) {
 
     const pic = "https://pbs.twimg.com/profile_images/1587405892437221376/h167Jlb2_400x400.jpg"
 
+    const [showUpdateModal, setShowUpdateModal] = useState(false);
+    const handleShowUpdateModal = () => setShowUpdateModal(true);
+    const handleCloseUpdateModal = () => setShowUpdateModal(false);
+    
     //determine which function to run , depending on whether user has liked the post
     const handleLike = () => (isLiked? removeFromLikes() : addToLikes());
-
+    
     const addToLikes = () => {
         setLikes([...likes, userId]);
         dispatch(likePost({userId, postId}));
     }
-
     const removeFromLikes = () => {
         setLikes(likes.filter((id) => id !== userId));
         dispatch(removeLikeFromPost({userId, postId}));
     }
-
     
+    const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+    const handleShowDeleteConfirmation = () => setShowDeleteConfirmation(true);
+    const handleCloseDeleteConfirmation = () => setShowDeleteConfirmation(false);
 
+    const handleDeleteConfirmation = () => {
+        dispatch(deletePost({userId, postId}));
+        handleCloseDeleteConfirmation()
+    }
+    
     return (
         <Row
             className="p-3"
@@ -69,8 +80,35 @@ export default function ProfilePostCard ({ post}) {
                     <Button variant="light">
                         <i className="bi bi-upload"></i>
                     </Button>
+
+                    <Button variant="light">
+                        <i 
+                            className="bi bi-pencil-square"
+                            onClick={handleShowUpdateModal}
+                        ></i>
+                    </Button>
+                    <Button variant="light" onClick={handleShowDeleteConfirmation}>
+                        <i className="bi bi-trash"></i>
+                    </Button>
+                    <UpdatePostModal
+                        show={showUpdateModal}
+                        handleClose={handleCloseUpdateModal}
+                        postId = {postId}
+                        originalPostContent={content}
+                    />
                 </div>
             </Col>
+                <Modal show={showDeleteConfirmation} onHide={handleCloseDeleteConfirmation}>
+                    <Modal.Header closeButton>
+                        <Modal.Title>Confirm Delete</Modal.Title>
+                    </Modal.Header>
+                    <Modal.Body>Are you sure you want to delete this post?</Modal.Body>
+                    <Modal.Footer>
+                        <Button variant="danger" onClick={handleDeleteConfirmation}>
+                            Delete
+                        </Button>
+                    </Modal.Footer>
+                </Modal>
         </Row>
     )
 }

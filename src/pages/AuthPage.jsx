@@ -1,8 +1,18 @@
-import { FacebookAuthProvider, GoogleAuthProvider, createUserWithEmailAndPassword, getAuth, sendPasswordResetEmail, signInWithEmailAndPassword, signInWithPopup } from "firebase/auth";
+import { FacebookAuthProvider, 
+    GoogleAuthProvider, 
+    createUserWithEmailAndPassword, 
+    getAuth, sendPasswordResetEmail, 
+    signInWithEmailAndPassword, 
+    signInWithPopup,
+    RecaptchaVerifier,
+    signInWithPhoneNumber
+ } from "firebase/auth";
 import { useContext, useEffect, useState } from "react";
 import {Col, Image, Row,  Modal, Form, Button, Alert} from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../components/AuthProvider";
+import PhoneInput from "react-phone-input-2";
+import 'react-phone-input-2/lib/style.css'
 
 export default function AuthPage () {
     const loginImage = "https://sig1.co/img-twitter-1";
@@ -31,9 +41,55 @@ export default function AuthPage () {
 
     const [showPhoneLoginModal, setShowPhoneLoginModal] = useState(false);
     const [phoneNumber, setPhoneNumber] =useState("");
-    const [code, setCode] =useState("");
-    const [verificationId, setVerificationId] = useState(null);
-
+    const [otp, setOtp] =useState("");
+    const [error, setError] = useState("");
+    const [flag, setFlag] = useState(false);
+    const [confirmObj, setConfirmObj] = useState("");
+    
+    const handleShowPhoneLogin = () => setShowPhoneLoginModal(true);
+    const setUpRecaptha = (phoneNumber) => {
+        const recaptchaVerifier = new RecaptchaVerifier(
+            auth, 'recaptcha-container', {}
+        );
+        recaptchaVerifier.render();
+        return signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier);
+    }
+    const getOtp = async (e) => {
+        e.preventDefault();
+        setError("")
+        if(phoneNumber === "" || phoneNumber === undefined)
+            return setError("Please enter a valid Phone Number.");
+        try {
+            const response = await setUpRecaptha(phoneNumber);
+            console.log(response);
+            setConfirmObj(response);
+            setFlag(true);
+        } catch (err) {
+            setError(err.message)
+        }
+        console.log(phoneNumber);
+    }
+    //const getOtp = async (phoneNumber) => {
+    //    try {
+    //        const verifier = setUpRecaptha();
+    //        await signInWithPhoneNumber(auth, phoneNumber, verifier);
+            // rest of the code
+    //    } catch (error) {
+    //        console.error(error);
+            // handle error
+    //    }
+    //};
+    const verifyOtp = async (e) => {
+        e.preventDefault();
+        if (otp === "" || otp === null) return;
+        try {
+            setError("");
+            await confirmObj.confirm(otp);
+            navigate("/profile");
+        } catch (err) {
+            setError(err.message)
+        }
+    }
 
     useEffect(() => {
         console.log(currentUser)
@@ -83,6 +139,7 @@ export default function AuthPage () {
             await signInWithEmailAndPassword(auth, username, password);
             console.log(currentUser)
         } catch (error) {
+            console.error(error);
 
             if (error.code === 'auth/invalid-email') {
                 setLoginMessage("Invalid email format.");
@@ -182,7 +239,7 @@ export default function AuthPage () {
                     <Button 
                         className="rounded-pill" 
                         variant="outline-primary"
-                        onClick={() => showPhoneLoginModal}
+                        onClick={handleShowPhoneLogin}
                     >
                         <i className="bi bi-telephone-fill"></i> Sign In with Phone
                     </Button>
@@ -300,27 +357,42 @@ export default function AuthPage () {
                 </Modal.Header>
                 <Modal.Body>
                     <Form>
-                        <Form.Group>
+                        <Form.Group  
+                            controlId="formBasicEmail"
+                        >
                             <Form.Label>Phone Number</Form.Label>
-                            <Form.Control 
-                                type="tel" 
+                            {error && <Alert variant="danger">{error}</Alert>}
+                            <PhoneInput
+                                defaultCountry={"my"}
                                 placeholder="Enter your phone number"
                                 value={phoneNumber}
-                                onChange={(e) => setPhoneNumber(e.target.value)}
+                                onChange={(phoneNumber) => setPhoneNumber("+" + phoneNumber)}
                             />
-                        </Form.Group>
-                        {verificationId && (
-                            <Form.Group>
-                                <Form.Label>Verification Code</Form.Label>
+                            <div id="recaptcha-container"/>
+                            <Button 
+                                variant="primary" 
+                                type="submit" className="my-2"
+                                onClick={getOtp}
+                            >Send OTP</Button>
+                            </Form.Group>
+                        
+                            <Form.Group  
+                                style={{ display: flag ? "block" : "none" }} 
+                                controlId="formBasicOtp"
+                            >
+                                <Form.Label>Verify OTP</Form.Label>
                                 <Form.Control 
                                     type="text" 
-                                    placeholder="Enter verification code"
-                                    value={code}
-                                    onChange={(e) => setCode(e.target.value)}
+                                    placeholder="Enter OTP"
+                                    value={otp}
+                                    onChange={(e) => setOtp(e.target.value)}
                                 />
+                                <Button 
+                                    variant="primary" 
+                                    onClick={verifyOtp}
+                                    className="my-2"
+                                >Verify</Button>
                             </Form.Group>
-                        )}
-                        
                     </Form>
                 </Modal.Body>
             </Modal>
