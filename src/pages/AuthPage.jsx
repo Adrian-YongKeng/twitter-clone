@@ -218,7 +218,7 @@ export default function AuthPage () {
                     <Button className="rounded-pill" variant="outline-dark">
                         <i className="bi bi-apple"></i> Sign Up with Apple
                     </Button>
-                    <Button className="rounded-pill" variant="outline-dark" >
+                    <Button className="rounded-pill" variant="outline-dark" onClick={handleFacebookLogin}>
                         <i className="bi bi-facebook"></i> Sign Up with Faceboook
                     </Button>
                     <p style={{textAlign: "center"}}>or</p>
